@@ -1,7 +1,8 @@
 '''This script iterates through a dataset, analyzing and making decisions on whether or not to open long or short positions.
 There are several customizable features available before calling the function that allow the user to easily develop their
 own strategy and see whether or not it is profitable. These features are described in detail throughout the script where
-they are declared.'''
+they are declared. There is a dataset provided for historical 1 minute Bitcoin data, but this is easily interchangable if
+you wish to backtest other assets, whether that be stocks, other cryptocurrencies, commodoties, currencies, etc...'''
 
 
 import pandas as pd
@@ -20,6 +21,7 @@ pd.set_option('display.max_rows', None)
 pd.set_option('display.precision', 10)
 
 # This is the main function that iterates through the dataframe
+# Input variable descriptions are commented at the bottom of the script where they are declared
 def load_and_test_model(df, risk, reward, timeout, look_ahead, plot_on, delay, trailing):
     df = df.sort_values(by='Timestamp', ascending=True)
     df = df.dropna()
@@ -41,6 +43,7 @@ def load_and_test_model(df, risk, reward, timeout, look_ahead, plot_on, delay, t
 
     for i in range(len(df)):
         # In order to plot the data, a certain amount of data has to pass, keep this in mind if developing a strategy on higher timeframes
+        # Plotting a large amount of data on a higher time frame will limit the amount of data that will be analyzed
         if i < look_ahead * 4:
             continue
         # The iteration can happen quickly, in order to visibly see the trades you can add a delay by adjusting the variable at the bottom of the script
@@ -51,10 +54,12 @@ def load_and_test_model(df, risk, reward, timeout, look_ahead, plot_on, delay, t
         utils.print_data(df, i, long_profit, long_loss, short_profit, short_loss, total_pl)
 
         # Simple strategy for opening trades based on moving averages
+        # If 20 period moving average crosses above 50 period moving average, open a long position
+        # If 20 period moving average crosses below 50 period moving average, open a short position
         if not open_position:
             if df['MA_20'].iloc[i-1] <= df['MA_50'].iloc[i-1] and df['MA_20'].iloc[i] >= df['MA_50'].iloc[i]:
                 initial_price_long = df['Close'].iloc[i]
-                sl_long = initial_price_long * 0.99 # Sets a stop loss one percent below the opening price, this can be adjusted to a higher threshold, recent low, etc...
+                sl_long = initial_price_long * 0.99 # Sets a stop loss one percent below the opening price, this can be adjusted to a higher/lower threshold, recent low, etc...
                 open_position = True
                 buy = 1
                 count = 0 # Used to manage trailing stop loss
@@ -65,7 +70,7 @@ def load_and_test_model(df, risk, reward, timeout, look_ahead, plot_on, delay, t
                     leverage = 1
                 if leverage > 100:
                     leverage = 100
-                # Take profit is calculated based on a designate risk to reward ratio
+                # Take profit price is calculated based on a designated risk to reward ratio
                 tp_long = initial_price_long * (1 + (((reward / (1 - (risk + 0.0015))) - 1) / leverage))
                 # Plot showing where the position was opened, the take profit level and the stop loss level
                 plot.plot_next_120_closes(df, 'open_position', i, look_ahead, 'Close', initial_price_long, tp_long, sl_long, 'MA_20', 'MA_50', 'null', plot_on)
@@ -73,7 +78,7 @@ def load_and_test_model(df, risk, reward, timeout, look_ahead, plot_on, delay, t
             # Logic for opening a short position is the inverse of logic for opening a long position
             if df['MA_20'].iloc[i-1] >= df['MA_50'].iloc[i-1] and df['MA_20'].iloc[i] <= df['MA_50'].iloc[i]:
                 initial_price_short = df['Close'].iloc[i]
-                sl_short = initial_price_short / 0.995
+                sl_short = initial_price_short / 0.99
                 open_position = True
                 sell = 1
                 count = 0
@@ -92,14 +97,14 @@ def load_and_test_model(df, risk, reward, timeout, look_ahead, plot_on, delay, t
             if buy > 0:
                 if trailing == 0:
                     # This function will close a position once the price reaches the take profit level or stop loss level
-                    trade_long = close_position.close_position_long(df['High'].iloc[i], df['Low'].iloc[i], tp_long, sl_long, initial_price_long)
+                    trade_long = close_position.close_position_long(df['High'].iloc[i], df['Low'].iloc[i], tp_long, sl_long)
                 else:
                     # This function enables a trailing stop, allowing the position to remain open if it is profitable and adjusting the stop loss level along the way
                     trade_long, tp_long, sl_long, count = close_position.close_position_long_trailing(df, df['High'].iloc[i], df['Low'].iloc[i], tp_long, sl_long, initial_price_long, count, i, look_ahead, plot_on)
                 utils.print_long_position(initial_price_long, leverage, tp_long, sl_long, df['Close'].iloc[i])
             if sell > 0:
                 if trailing == 0:
-                    trade_short = close_position.close_position_short(df['High'].iloc[i], df['Low'].iloc[i], tp_short, sl_short, initial_price_short)
+                    trade_short = close_position.close_position_short(df['High'].iloc[i], df['Low'].iloc[i], tp_short, sl_short)
                 else:
                     trade_short, tp_short, sl_short, count = close_position.close_position_short_trailing(df, df['High'].iloc[i], df['Low'].iloc[i], tp_short, sl_short, initial_price_short, count, i, look_ahead, plot_on)
                 utils.print_short_position(initial_price_short, leverage, tp_short, sl_short, df['Close'].iloc[i])
@@ -124,9 +129,12 @@ def load_and_test_model(df, risk, reward, timeout, look_ahead, plot_on, delay, t
                             sl_short = df['Close'].iloc[i]
                         input('lskdfj')
                 
-            '''This segment of code will close the positions once the designated levels have been reached. The function for 
+            '''This segment of code will close the position once the designated levels have been reached. The function for 
             closing positions returns a 1 for a profitable trade or a -1 for a loss. However in the function for a trailing
-            stop loss, the stop loss level is adjusted during a profitable position, resulting in a net positive trade.'''  
+            stop loss, the position is only closed once a stop loss level is reached. If a take profit level is reached,
+            the stop loss loevel is then adjusted, resulting in a profitable trade even if the stop loss level is reached. A
+            -1 is always returned in this case, so there is logic present to identify whether or not a -1 is a profitable
+            trade or a loss.'''  
             if buy > 0:
                 if trade_long == -1:
                     pl_long = 1 + (((sl_long - initial_price_long) / initial_price_long) - 0.0015) * leverage
@@ -186,15 +194,17 @@ def load_and_test_model(df, risk, reward, timeout, look_ahead, plot_on, delay, t
 
 
 if __name__ == "__main__":
-    risk = 0.1 # Amount of risk taken on per trade
+    risk = 0.01 # Amount of risk taken on per trade
     reward = 1 # Ratio used to calculate take profit levels
-    timeout = 0 # Set this based on the designated timeframe, if using the 5 minute time frame, setting this to 12 would close the position if the trade was open for 1 hour without reaching the take profit or stop loss level
+    # Set this based on the designated timeframe, if using the 5 minute time frame, setting this to 12 would close the position if the trade was open for 1 hour without reaching the take profit or stop loss level
+    # Setting this variable to 0 disables the timeout logic, meaning the trade will remain open until the take profit or stop loss level is reached
+    timeout = 0 
     look_ahead = 144 # This is used to plot data, larger numbers plot more data and smaller numbers plot less data
     plot_on = 1 # If you do not want to plot data and simply want to run a backtest, set this to 0
     delay = 0 # The iteration can run quickly, setting a delay allows you to watch the data as the loop executes, set to 0 for no delay
-    trailing = 1 # Set this to 1 to enable a trailing stop for closing positions, setting to 0 means the position will close if the take profit or stop loss level is reached
+    trailing = 0 # Set this to 1 to enable a trailing stop for closing positions, setting to 0 means the position will close if the take profit or stop loss level is reached
     timeframe = '5m' #Availble timeframes are 1 minute, 5 minute, 15 minute, 1 hour, 4 hour, and 1 day. The dataset holds 1 minute data but this can be aggregated to any timeframe
-    df = pd.read_csv('/Users/alexolson/Desktop/py/Current_Model/Data/Kraken/BTCUSD_1.csv')
+    df = pd.read_csv('path_to_your_dataset')
     df.columns = ['Timestamp', 'Open', 'High', 'Low', 'Close', 'Volume', 'Trades']
     df = df[['Timestamp', 'Open', 'High', 'Low', 'Close', 'Volume']]
     df['Timestamp'] = pd.to_datetime(df['Timestamp'], unit='s')

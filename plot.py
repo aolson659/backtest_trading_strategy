@@ -1,4 +1,4 @@
-'''The function for plotting data will plot data in two different ways. It will plot data for opening a position and 
+'''The function for plotting data will plot data in several different ways. It will plot data for opening a position and 
 adjusting profit/stop levels when trailing stop logic is enabled.
 
 It will also plot data when a position is closed, showing the price at which the position was opened and the price at which

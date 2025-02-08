@@ -1,8 +1,9 @@
 '''The functions in this script are used to close positons. close_position_long and close_position_short will close the
 position as soon as a take profit or stop loss level is reached. Since main.py is iterating through a dataframe, looking
-at data at the end of each timeframe, the high and low of each datapoint is used to determine whether or not the take
-profit or stop loss was reached. This is because in a live market scenario, that price level would have been reached
-while the candle was forming and closed at that time, not when the candle was closed.
+at data at the end of each candlestick close (every 5 minutes, every 15 minutes, etc...), the high and low of each 
+datapoint is used to determine whether or not the take profit or stop loss was reached. This is because in a live market 
+scenario, that price level would have been reached while the candle was forming and closed at that time, not when the 
+candle was closed.
 
 close_position_long_trailing and close_position_short_trailing use trailing stop logic to allow profitable positions
 to remain open as the price continues to rise or fall. The take profit and stop loss levels are adjusted as the price moves.
@@ -11,7 +12,7 @@ and stop loss level will be set, allowing the position to capture more profitabi
 
 import plot
 
-def close_position_long(high, low, tp, sl, initial_price):
+def close_position_long(high, low, tp, sl):
     if low <= sl:
         trade_long = -1
     elif high >= tp:
@@ -20,7 +21,7 @@ def close_position_long(high, low, tp, sl, initial_price):
         trade_long = 0
     return trade_long
 
-def close_position_short(high, low, tp, sl, initial_price):
+def close_position_short(high, low, tp, sl):
     if high >= sl:
         trade_short = -1
     elif low <= tp:
@@ -33,8 +34,8 @@ def close_position_long_trailing(df, high, low, tp, sl, initial_price, count, i,
     if low <= sl:
         trade_long = -1
     elif high >= tp:
-        if count == 0: # The variabel count is used to keep track of how many times the position reaches a profitable level
-            tp = tp * 1.005 # The first time the happens, only the take profit level is updated
+        if count == 0: # The variabe count is used to keep track of how many times the position reaches a profitable level
+            tp = tp * 1.005 # The first time this happens, only the take profit level is updated
         elif count == 1:
             tp = tp * 1.005
             sl = initial_price * 1.005 # When the second level is reached, the stop loss is set so that the position will close while profitalbe
